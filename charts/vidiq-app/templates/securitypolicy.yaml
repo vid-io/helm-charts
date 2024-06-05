@@ -1,0 +1,26 @@
+{{- range $key, $value := $.Values }}
+{{- if contains "oidc_" $key }}
+{{- $service := (split "_" $key)._1 }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ print $service "-oidc"}}
+  namespace: {{ $.Values.namespace }}
+spec:
+  oidc:
+    clientID: {{ $.Values.oauth_id }}
+    clientSecret:
+      group: ""
+      kind: Secret
+      name: google-oauth-oidc
+    logoutPath: {{ $value.logout_path | default "/logout" }}
+    provider:
+      issuer: https://accounts.google.com
+    redirectURL: {{ $value.redirect_url }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ print $service "-" $.Values.name }}
+{{- end }}
+{{- end }}

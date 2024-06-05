@@ -1,61 +1,46 @@
+{{- $labels := dict "app" $.Values.name "environment" $.Values.environment }}
+
+{{- if $.Values.image }}
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: {{ $.Values.kind | default "Deployment" }}
 metadata:
-  name: {{ include "vidiq-app.fullname" . }}
-  labels:
-    {{- include "vidiq-app.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+  name: {{ $.Values.name }}
+  namespace: {{ $.Values.namespace }}
+  labels: {{ toYaml (mergeOverwrite ($.Values.labels | default dict) $labels) | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: {{ $.Values.replicas | default 1 }}
+  revisionHistoryLimit: 3
+{{- if or (not $.Values.kind) (eq $.Values.kind "Deployment") }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ $.Values.maxSurge | default 1 }}
+      maxUnavailable: {{ $.Values.maxUnavailable | default 0 }}
+{{- end }}
   selector:
-    matchLabels:
-      {{- include "vidiq-app.selectorLabels" . | nindent 6 }}
+    matchLabels: {{ toYaml $labels | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "vidiq-app.selectorLabels" . | nindent 8 }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "vidiq-app.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      labels: {{ toYaml $labels | nindent 8 }}
+{{- $affinity := $.Values.app_affinity }}
+{{- with index $affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution 0 }}
+{{- $_ := set .podAffinityTerm.labelSelector "matchLabels" (dict "app" $.Values.name) }}
+{{- end }}
+{{- $spec := dict }}
+{{- $_ := set $spec "affinity" $affinity }}
+{{- $_ := set $spec "nodeSelector" $.Values.app_selector }}
+{{- $_ := set $spec "serviceAccountName" (print "sa-" $.Values.namespace) }}
+{{- $container := dict }}
+{{- range $key, $value := $.Values }}
+{{- if has $key $.Values.container_keys }}
+{{- $_ := set $container $key $value }}
+{{- else if has $key $.Values.spec_keys }}
+{{- $_ := set $spec $key $value }}
+{{- end }}
+{{- end }}
+{{- $_ := set $spec "containers" (list $container) }}
+    spec: {{ toYaml $spec | nindent 6 }}
+{{- end }}

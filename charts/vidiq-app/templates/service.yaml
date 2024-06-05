@@ -1,15 +1,15 @@
+{{- $labels := dict "app" $.Values.name "environment" $.Values.environment }}
+
+{{- if $.Values.service_ports }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "vidiq-app.fullname" . }}
-  labels:
-    {{- include "vidiq-app.labels" . | nindent 4 }}
+  name: {{ $.Values.name }}
+  namespace: {{ $.Values.namespace }}
+  labels: {{ toYaml (mergeOverwrite (dict "monitoring" "true") $labels) | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
-  selector:
-    {{- include "vidiq-app.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
+  selector: {{ toYaml $labels | nindent 4 }}
+  ports: {{ toYaml $.Values.service_ports | nindent 2 }}
+{{- end }}
