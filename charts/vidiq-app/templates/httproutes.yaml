@@ -1,36 +1,43 @@
-{{- range $key, $value := $.Values }}
-{{- if contains "routes_" $key }}
-{{- $host := (split "_" $key)._1 }}
----
+{{- $routes := .Values.routes }}
+{{- range $host, $services := $routes }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ print $host "-" $.Values.name }}
+  name: {{ $.Values.name }}-{{ $host | replace "." "-" }}
   namespace: {{ $.Values.namespace }}
 spec:
-  parentRefs:
-  - name: gateway
-    namespace: gateway
   hostnames:
-{{- range $dmn := $.Values.domains | sortAlpha }}
-  - {{ print $host "." $dmn }}
-{{- end }}
+    - {{ $host }}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway
+      namespace: gateway
   rules:
-{{- $routes := chunk 7 $value }}
-{{- range $item := $routes }}
-  - backendRefs:
-    - kind: Service
-      name: {{ $.Values.name }}
-      port: {{ $.Values.gw_port | default 80 }}
-    matches:
-{{- range $route := $item | sortAlpha }}
-    - path:
-        type: PathPrefix
-        value: {{ $route }}
-{{- end }}
-    timeouts:
-      backendRequest: 60s
-      request: 60s
-{{- end }}
-{{- end }}
+    {{- range $serviceName, $service := $services }}
+    {{- $paths := $service.paths }}
+    {{- $numPaths := (len $paths) }}
+    {{- $batches := (div $numPaths 7) }}
+    {{- range $i := until ($batches| int) }}
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ $serviceName }}
+          port: {{ $service.port }}
+      matches:
+        {{- $start := mul $i 7 }}
+        {{- $end := min (add $start 7) $numPaths }}
+        {{- range $index, $path := (slice $paths $start $end) }}
+        - path:
+            type: PathPrefix
+            value: {{ $path.name }}
+            {{- if $path.gzip }}
+            gzip: true
+            {{- end }}
+        {{- end }}
+      timeouts:
+        backendRequest: 60s
+        request: 60s
+    {{- end }}
+  {{- end }}
 {{- end }}
