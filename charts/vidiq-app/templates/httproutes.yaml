@@ -28,10 +28,10 @@ spec:
         {{- $start := mul $i 7 }}
         {{- $end := min (add $start 7) $numPaths }}
         {{- range $index, $path := (slice $paths $start $end) }}
-        - path:
-            {{- if not $path.features }}
-            type: PathPrefix
-            value: {{ $path.name }}
+        {{- if not $path.features }}
+          - path:
+              type: PathPrefix
+              value: {{ $path.name }}
             {{- end }}
         {{- end }}
       timeouts:
@@ -49,7 +49,7 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+  name: {{ $.Values.name }}-{{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
   namespace: {{ $.Values.namespace }}
 spec:
   hostnames:
@@ -79,16 +79,21 @@ metadata:
   name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
   namespace: {{ $.Values.namespace }}
 spec:
-  {{- if $path.features.gzip }}
-  gzip: true
+  {{- if and $path.features.gzip $path.features.gzip.enabled }}
+  compression:
+    type: Gzip
+    {{- if $path.features.gzip.configuration }}
+    gzip:
+    {{ $path.features.gzip.configuration | toYaml | indent 2 }}
+    {{- end }}
   {{- end }}
-  {{- if $path.features.retries }}
+  {{- if and $path.features.retries $path.features.retries.enabled }}
   retry:
-    numRetries: {{ $path.features.retries.number | default 3 }}
-    {{- if $path.features.retries.http_status_code }}
+    numRetries: {{ $path.features.retries.configuration.number | default 3 }}
+    {{- if and $path.features.retries.configuration $path.features.retries.configuration.http_status_code }}
     retryOn:
       httpStatusCodes:
-        - 500
+        - {{ $path.features.retries.configuration.http_status_code }}
       triggers:
         - connect-failure
         - retriable-status-codes
