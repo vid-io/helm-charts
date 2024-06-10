@@ -1,36 +1,110 @@
-{{- range $key, $value := $.Values }}
-{{- if contains "routes_" $key }}
-{{- $host := (split "_" $key)._1 }}
----
+{{- $routes := .Values.routes }}
+{{- range $host, $services := $routes }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ print $host "-" $.Values.name }}
+  name: {{ $.Values.name }}-{{ $host | replace "." "-" }}
   namespace: {{ $.Values.namespace }}
 spec:
-  parentRefs:
-  - name: gateway
-    namespace: gateway
   hostnames:
-{{- range $dmn := $.Values.domains | sortAlpha }}
-  - {{ print $host "." $dmn }}
-{{- end }}
+    - {{ $host }}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway
+      namespace: gateway
   rules:
-{{- $routes := chunk 7 $value }}
-{{- range $item := $routes }}
-  - backendRefs:
-    - kind: Service
-      name: {{ $.Values.name }}
-      port: {{ $.Values.gw_port | default 80 }}
-    matches:
-{{- range $route := $item | sortAlpha }}
-    - path:
-        type: PathPrefix
-        value: {{ $route }}
+    {{- range $serviceName, $service := $services }}
+    {{- $paths := $service.paths }}
+    {{- $numPaths := (len $paths) }}
+    {{- $batches := (div $numPaths 7) }}
+    {{- range $i := until ($batches| int) }}
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ $serviceName }}
+          port: {{ $service.port | default 80}}
+      matches:
+        {{- $start := mul $i 7 }}
+        {{- $end := min (add $start 7) $numPaths }}
+        {{- range $index, $path := (slice $paths $start $end) }}
+        {{- if not $path.features }}
+          - path:
+              type: PathPrefix
+              value: {{ $path.name }}
+            {{- end }}
+        {{- end }}
+      timeouts:
+        backendRequest: 60s
+        request: 60s
+    {{- end }}
+  {{- end }}
 {{- end }}
-    timeouts:
-      backendRequest: 60s
-      request: 60s
+---
+{{- range $host, $services := $routes }}
+{{- range $serviceName, $service := $services }}
+{{- $paths := $service.paths }}
+{{- range $path := $paths }}
+{{- if $path.features }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $.Values.name }}-{{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  hostnames:
+    - {{ $host }}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway
+      namespace: gateway
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ $serviceName }}
+          port: {{ $service.port }}
+      matches:
+        - path:
+            type: PathPrefix
+            value: {{ $path.name }}
+      timeouts:
+        backendRequest: 60s
+        request: 60s
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  {{- if and $path.features.gzip $path.features.gzip.enabled }}
+  compression:
+    type: Gzip
+    {{- if $path.features.gzip.configuration }}
+    gzip:
+    {{ $path.features.gzip.configuration | toYaml | indent 2 }}
+    {{- end }}
+  {{- end }}
+  {{- if and $path.features.retries $path.features.retries.enabled }}
+  retry:
+    numRetries: {{ $path.features.retries.configuration.number | default 3 }}
+    {{- if and $path.features.retries.configuration $path.features.retries.configuration.http_status_code }}
+    retryOn:
+      httpStatusCodes:
+        - {{ $path.features.retries.configuration.http_status_code }}
+      triggers:
+        - connect-failure
+        - retriable-status-codes
+    {{- end }}
+  {{- end }}
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+    namespace: {{ $.Values.namespace }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
