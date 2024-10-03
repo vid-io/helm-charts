@@ -43,4 +43,5 @@ spec:
 {{- end }}
 {{- $_ := set $spec "containers" (list $container) }}
     spec: {{ toYaml $spec | nindent 6 }}
+      terminationGracePeriodSeconds: 60
 {{- end }}
