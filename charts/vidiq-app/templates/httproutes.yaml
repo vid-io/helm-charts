@@ -17,7 +17,7 @@ spec:
     {{- range $serviceName, $service := $services }}
     {{- $paths := $service.paths }}
     {{- $numPaths := (len $paths) }}
-    {{- $batches := (div $numPaths 7) }}
+    {{- $batches := (div (add $numPaths 6) 7) }}
     {{- range $i := until ($batches| int) }}
     - backendRefs:
         - group: ""
