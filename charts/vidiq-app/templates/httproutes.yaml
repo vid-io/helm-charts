@@ -1,5 +1,6 @@
 {{- $routes := .Values.routes }}
 {{- range $host, $services := $routes }}
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
