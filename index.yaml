@@ -3,6 +3,16 @@ entries:
   vidiq-app:
   - apiVersion: v2
     appVersion: 1.0.5
+    created: "2024-10-29T13:43:13.929507316Z"
+    description: A Helm chart for Kubernetes
+    digest: d0471461b7a7963a9b742f32ec8c3e64b1bdfeb1f5c0a137f4dabb6cb9d13e72
+    name: vidiq-app
+    type: application
+    urls:
+    - https://github.com/vid-io/helm-charts/releases/download/vidiq-app-1.0.11/vidiq-app-1.0.11.tgz
+    version: 1.0.11
+  - apiVersion: v2
+    appVersion: 1.0.5
     created: "2024-10-25T13:32:35.252694495Z"
     description: A Helm chart for Kubernetes
     digest: 708ded6ec8271b7b7e79ed54ab0959e725f57b09c987ce9b28b853b512ddadd5
@@ -81,4 +91,4 @@ entries:
     urls:
     - https://github.com/vid-io/helm-charts/releases/download/vidiq-app-1.0.3/vidiq-app-1.0.3.tgz
     version: 1.0.3
-generated: "2024-10-25T13:32:35.252727798Z"
+generated: "2024-10-29T13:43:13.92954643Z"
