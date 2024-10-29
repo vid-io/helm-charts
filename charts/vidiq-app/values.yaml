@@ -8,6 +8,7 @@ spec_keys:
 - nodeSelector
 - securityContext
 - serviceAccountName
+- terminationGracePeriodSeconds
 
 container_keys:
 - name
@@ -21,6 +22,7 @@ container_keys:
 - volumeMounts
 - livenessProbe
 - readinessProbe
+- lifecycle
 
 app_selector:
   role: app

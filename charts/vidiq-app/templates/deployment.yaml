@@ -43,16 +43,4 @@ spec:
 {{- end }}
 {{- $_ := set $spec "containers" (list $container) }}
     spec: {{ toYaml $spec | nindent 6 }}
-      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds | default 30 }}
-{{- if $.Values.lifecycle }}
-      lifecycle:
-        {{- if $.Values.lifecycle.preStop }}
-        preStop:
-          {{- toYaml $.Values.lifecycle.preStop | nindent 8 }}
-        {{- end }}
-        {{- if $.Values.lifecycle.postStart }}
-        postStart:
-          {{- toYaml $.Values.lifecycle.postStart | nindent 8 }}
-        {{- end }}
-{{- end }}
 {{- end }}
