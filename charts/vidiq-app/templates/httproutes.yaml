@@ -44,68 +44,28 @@ spec:
 ---
 {{- range $host, $services := $routes }}
 {{- range $serviceName, $service := $services }}
-{{- $paths := $service.paths }}
-{{- range $path := $paths }}
-{{- if $path.features }}
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: {{ $.Values.name }}-{{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
-  namespace: {{ $.Values.namespace }}
-spec:
-  hostnames:
-    - {{ $host }}
-  parentRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: gateway
-      namespace: gateway
-  rules:
-    - backendRefs:
-        - group: ""
-          kind: Service
-          name: {{ $serviceName }}
-          port: {{ $service.port }}
-      matches:
-        - path:
-            type: PathPrefix
-            value: {{ $path.name }}
-      timeouts:
-        backendRequest: 60s
-        request: 60s
----
+{{- if and $service.features.retries $service.features.retries.enabled }}
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
-  name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+  name: {{ $.Values.name }}-{{ $serviceName }}-{{ $host | replace "." "-" }}
   namespace: {{ $.Values.namespace }}
 spec:
-  {{- if and $path.features.gzip $path.features.gzip.enabled }}
-  compression:
-    type: Gzip
-    {{- if $path.features.gzip.configuration }}
-    gzip:
-    {{ $path.features.gzip.configuration | toYaml | indent 2 }}
-    {{- end }}
-  {{- end }}
-  {{- if and $path.features.retries $path.features.retries.enabled }}
   retry:
-    numRetries: {{ $path.features.retries.configuration.number | default 3 }}
-    {{- if and $path.features.retries.configuration $path.features.retries.configuration.http_status_code }}
+    numRetries: 3
+    perRetry:
+      timeout: 2s
+      backOff:
+        baseInterval: 1s
+        maxInterval: 3s
     retryOn:
-      httpStatusCodes:
-        - {{ $path.features.retries.configuration.http_status_code }}
       triggers:
-        - connect-failure
-        - retriable-status-codes
-    {{- end }}
-  {{- end }}
+        - gateway-error
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
-    name: {{ $path.name | replace "/" ""}}-{{ $host | replace "." "-" }}
+    name: {{ $.Values.name }}-{{ $host | replace "." "-" }}
     namespace: {{ $.Values.namespace }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
