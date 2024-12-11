@@ -52,15 +52,18 @@ metadata:
   namespace: {{ $.Values.namespace }}
 spec:
   retry:
-    numRetries: 3
+    numRetries: {{ $service.features.retries.configuration.numRetries | default 3 }}
     perRetry:
-      timeout: 2s
+      timeout: {{ $service.features.retries.configuration.perRetry.timeout | default 3s }}
       backOff:
-        baseInterval: 1s
-        maxInterval: 3s
+        baseInterval: {{ $service.features.retries.configuration.perRetry.backOff.baseInterval | default 1s }}
+        maxInterval: {{ $service.features.retries.configuration.perRetry.backOff.maxInterval | default 3s }}
     retryOn:
       triggers:
-        - gateway-error
+         {{- $defaultTriggers := (list "gateway-error") }}
+         {{- range $trigger := (or $service.features.retries.configuration.retryOn.triggers $defaultTriggers) }}
+         - {{ $trigger }}
+         {{- end }} 
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
